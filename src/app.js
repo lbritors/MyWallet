@@ -76,7 +76,9 @@ try{
 }
 });
 
-app.post("/nova-transacao/:tipo", (req, res) => {
+console.log(dayjs(1682131284727).format("DD/MM"));
+
+app.post("/nova-transacao/:tipo", async(req, res) => {
     const {tipo} = req.params;
     const {authorization} = req.headers;
     const {valor, descricao} = req.body;
@@ -84,31 +86,112 @@ app.post("/nova-transacao/:tipo", (req, res) => {
     const token = authorization?.replace("Bearer ", "");
     const schema = Joi.object({
         tipo: Joi.string().required(),
-        data: Joi.date().required(),
+        data: Joi.allow().required(),
         valor: Joi.number().positive().precision(2).required(),
         descricao: Joi.string().required()
     });
     const transacao = {
         tipo: tipo,
-        data: dayjs().format('DD/MM'),
+        data: Date.now(),
         valor: valor,
         descricao: descricao
     }
-
     const validation = schema.validate(transacao, {abortEarly: false});
-    const erros = validation.error.details.map(detail => detail.message);
-    
-    if(validation.error) return res.status(422).send(erros);
     if(!authorization) return res.sendStatus(401);
-   
+    if(validation.error) {
+        const erros = validation.error.details.map(detail => detail.message);
+        return res.status(422).send(erros);
+    } 
+    const valorTratado = valor.toFixed(2).replace(".", ",");
+    delete transacao.valor;
 
  try{
-    res.send("ok");
+    const cadastrado = await db.collection("sessoes").findOne({token: token});
+    if(!cadastrado) return res.sendStatus(401);
+    await db.collection("transacoes").insertOne({...transacao, valorTratado, idUser: cadastrado.idUser});
+    res.sendStatus(201);
  }catch(err) {
     res.status(500).send(err.message);
  }
 
 });
+
+app.get("/home", async(req,res) => {
+    const {authorization} = req.headers;
+    const token = authorization?.replace("Bearer ", "");
+    if(!authorization) return res.sendStatus(401);
+
+    try{
+        const logado = await db.collection("sessoes").findOne({token: token});
+        if(!logado) return res.sendStatus(401);
+        const transacoes = await db.collection("transacoes").find({idUser: new ObjectId(logado.idUser)}).toArray();
+        console.log(transacoes);
+        res.status(200).send(transacoes);
+    }catch(err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.delete("/home/:id", async(req, res) => {
+    const {authorization} = req.headers;
+    const {id} = req.params;
+    const token = authorization?.replace("Bearer ", "");
+
+
+    try{
+        const logado = await db.collection("sessoes").findOne({token: token});
+        if(!logado) return res.sendStatus(401);
+        const transacoes = await db.collection("transacoes").findOne({_id: new ObjectId(id)});
+        console.log(transacoes);
+        if(!transacoes) return res.sendStatus(404);
+        // if(new ObjectId(logado.idUser) !== new ObjectId(transacoes.idUser)) return res.sendStatus(401);
+        await db.collection("transacoes").deleteOne({_id: new ObjectId(id)});
+        res.sendStatus(202);
+
+
+    }catch(err) {
+        res.send(500).console.log(err);
+    }
+})
+
+app.put("/editar-registro/:tipo", async(req, res) => {
+    const {authorization} = req.headers;
+    const {tipo} = req.params;
+    const {valor, descricao} = req.body;
+    
+    const token = authorization?.replace("Bearer ", "");
+    const schema = Joi.object({
+        tipo: Joi.string().required(),
+        data: Joi.allow().required(),
+        valor: Joi.number().positive().precision(2).required(),
+        descricao: Joi.string().required()
+    });
+    const transacao = {
+        tipo: tipo,
+        data: Date.now(),
+        valor: valor,
+        descricao: descricao
+    }
+
+    const validation = schema.validate(transacao, {abortEarly: false});
+    if(!authorization) return res.sendStatus(401);
+    if(validation.error) {
+        const erros = validation.error.details.map(detail => detail.message);
+        return res.status(422).send(erros);
+    } 
+    const valorTratado = valor.toFixed(2).replace(".", ",");
+    delete transacao.valor;
+    
+    try{
+        const logado = await db.collection("sessoes").findOne({token: token});
+        if(!logado) return res.sendStatus(401);
+        // const match = await db.collection("transacoes").findOneAndUpdate({valor: valorTratado, descricao:descricao}, {$set: })
+
+    }catch(err){
+        res.status(500).send(err.message);
+    }
+
+})
 
 app.listen(5000, console.log("Listening PORT 5000"));
 

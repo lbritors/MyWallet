@@ -6,15 +6,14 @@ import Joi from "joi";
 import bcrypt from "bcrypt";
 import { v4 as uuid } from "uuid";
 import { ObjectId } from "mongodb";
-import dayjs from "dayjs";
-import 'dayjs/locale/pt-br.js';
+
 
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 dotenv.config();
-dayjs.locale("pt-br");
+
 
 const mongoClient = new MongoClient(process.env.DATABASE_URL);
 try{
@@ -76,7 +75,6 @@ try{
 }
 });
 
-console.log(dayjs(1682131284727).format("DD/MM"));
 
 app.post("/nova-transacao/:tipo", async(req, res) => {
     const {tipo} = req.params;
@@ -102,13 +100,11 @@ app.post("/nova-transacao/:tipo", async(req, res) => {
         const erros = validation.error.details.map(detail => detail.message);
         return res.status(422).send(erros);
     } 
-    const valorTratado = valor.toFixed(2).replace(".", ",");
-    delete transacao.valor;
 
  try{
     const cadastrado = await db.collection("sessoes").findOne({token: token});
     if(!cadastrado) return res.sendStatus(401);
-    await db.collection("transacoes").insertOne({...transacao, valorTratado, idUser: cadastrado.idUser});
+    await db.collection("transacoes").insertOne({...transacao, idUser: cadastrado.idUser});
     res.sendStatus(201);
  }catch(err) {
     res.status(500).send(err.message);

@@ -8,13 +8,6 @@ export async function  signUp (req, res)  {
     const {nome, email, senha, confirmeSenha} = req.body;
   
     
-    const validation = userSchema.validate(req.body, {abortEarly: false});
-    if(validation.error){
-        const erros = validation.error.details.map(e => e.message);
-        return res.status(422).send(erros);
-
-    }
-
     const senhaCript = bcrypt.hashSync(senha, 10);
     try{
         const user = await db.collection("usuarios").findOne({email: email});
@@ -34,7 +27,6 @@ export async function login(req, res) {
     
     try{
         const login = await db.collection("usuarios").findOne({email: email});
-        console.log(login);
         if(!login) return res.status(404).send("E-mail não cadastrado!");
         if(senha && bcrypt.compareSync(senha, login.senhaCript)) {
             await db.collection("sessoes").insertOne({idUser: login._id, token: token, lastStatus: Date.now()});
@@ -51,8 +43,8 @@ export async function login(req, res) {
 
 setInterval(async() => {
     const hora = Date.now();
-    const intervalo = 180000
+    const intervalo = 18000;
     const loggedOut =  await db.collection("sessoes").find({lastStatus: {$lt: hora - intervalo}});
     db.collection("sessoes").deleteMany(loggedOut);
-}, 180000);
+}, 18000);
 
